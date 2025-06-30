@@ -3,6 +3,8 @@ import os
 import subprocess
 from datetime import datetime
 from werkzeug.utils import secure_filename
+import hashlib
+import subprocess
 
 # === Funzione per ottenere l'SSID della rete Wi-Fi ===
 def get_ssid():
@@ -38,6 +40,7 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, "serverStuff/uploads")
 CHAT_LOG = os.path.join(BASE_DIR, "serverStuff/chat.txt")
 USERS_FILE = os.path.join(BASE_DIR, "users.txt")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "serverStuff/templates")
+SERVER_KEY = os.path.join(BASE_DIR, "certs/myServer/server.key")
 
 app = Flask(__name__, template_folder=TEMPLATES_DIR)
 app.secret_key = 'supersegreto'
@@ -93,6 +96,7 @@ def send():
         f.write(f"[{now}] {session['username']}: {msg}\n")
     return '', 204
 
+
 @app.route("/upload", methods=['POST'])
 def upload():
     if 'username' not in session:
@@ -101,14 +105,32 @@ def upload():
     file = request.files['file']
     if file:
         filename = secure_filename(file.filename)
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+
+        # Firma digitale diretta del file usando la chiave privata del server
+        signature_path = filepath + '.sig'
+        with open(filepath, 'rb') as f:
+            subprocess.run([
+                "openssl", "dgst", "-sha256",
+                "-sign", SERVER_KEY,
+                "-out", signature_path,
+                "-"
+            ], input=f.read())
 
     return redirect(url_for('index'))
 
-@app.route("/files/<filename>")
-def files_route(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+from flask import send_file
 
+@app.route('/files/<filename>')
+def serve_file(filename):
+    if 'username' not in session:
+        return redirect(url_for('index'))  # Nessuna sessione? Torna alla login
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True)
+    else:
+        return "File non trovato", 404
 @app.route("/messages")
 def get_messages():
     if os.path.exists(CHAT_LOG):

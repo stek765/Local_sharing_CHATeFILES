@@ -1,102 +1,116 @@
-# 🔐 Local Sharing - Secure LAN Communication
+# 🔐 Local Sharing CHAT&FILES - Secure LAN Communication
 
-**Local Sharing** is a lightweight, local web application to **securely exchange messages and files within your LAN**.
+**Local Sharing** is a secure, local-first web application for exchanging files and messages over your LAN — with no accounts, no passwords, and no internet servers.
 
-No servers on the Internet. No user accounts. Just fast, private, local communication with real client certificate authentication.
-
----
-
-## 🧠 Why this?
-
-Most LAN tools are either insecure or require passwords.  
-**Local Sharing** uses your own **Certificate Authority (CA)** and **client certificates** to authenticate users **automatically**, ensuring:
-
-- ✅ Only approved users can access the app
-- 🔒 All messages and file transfers are encrypted (HTTPS)
-- 👁️ No credentials are sent over the network
+It uses **TLS mutual authentication** and **digital signatures** to ensure confidentiality, authenticity, and integrity.
 
 ---
 
-## ⚙️ How it works
+## 🛡️ Security Features
 
-1. A server runs locally (`server.py`) with HTTPS and certificate-based authentication
-2. Clients open the page from any device in the LAN (e.g. https://192.168.1.42:5010)
-3. The browser presents a valid **client certificate** to log in
-4. Each message and upload is stored **only locally**
+### ✅ Mutual TLS Authentication
+- Only authorized clients with a valid certificate can access the system
+- Each user has their own private key and certificate, signed by a local CA
 
----
+### ✅ Confidentiality
+- All data (messages, uploads) is transmitted over HTTPS (TLS)
+- Certificates are used instead of passwords — no credentials sent over the network
 
-## 🛡️ Security model
-
-- 🔐 Uses **TLS with mutual authentication** (client+server certificates)
-- 🧾 You generate your own **CA** (Certificate Authority)
-- 👤 Each user has a signed **certificate and private key**
-- 🧱 Unauthorized clients are **rejected at connection**
+### ✅ Integrity
+- Uploaded files are signed server-side using the server's private key
+- A `.sig` file is created for each file, allowing users to verify authenticity later
 
 ---
 
-## 🚀 Getting started
+## 🚀 Setup Instructions
 
-1. **Generate your CA** (once)
-   ```bash
-   ./init_ca.sh
-   ```
+You can set up everything in under 5 minutes.
 
-2. **Add a new user** (e.g. `mario`)
-   ```bash
-   ./add_user.sh mario
-   ```
-
-   This creates:
-   - `clients/mario.crt` + `mario.key`
-   - A package in `packages/mario/` with everything needed
-   - Adds `mario` to the `users.txt` whitelist
-
-
-3. **Run the server**
-   ```bash
-   python3 server.py
-   ```
-
-4. **Install the user's certificate**  
-   On macOS:
-   ```bash
-   ./setup_client.sh mario
-   ```
-
-
-
-5. **Open the app**
-   Open the local server URL in your browser, e.g.  
-   https://localhost:5010 or https://your-ip:5010
-
----
-
-## ❌ Remove a user
-
-To fully remove a user (files, portachiain, whitelist):
+### 1. Clone the repository and enter the folder
 ```bash
-./remove_user.sh mario
+git clone https://github.com/stek765/Local_sharing_CHATeFILES.git
+cd Local_sharing_CHATeFILES
+```
+
+### 2. Generate your Certificate Authority (CA)
+This will create:
+- Your root `ca.crt` and `ca.key`
+- A signed server certificate and key
+
+```bash
+./init_ca.sh
+```
+
+### 3. Add a new user (e.g., `mario`)
+This creates a certificate, key, and a ready-to-install package:
+```bash
+./add_user.sh mario
+```
+
+You will get:
+- `clients/mario.crt` and `mario.key`
+- A user package in `packages/mario/` for easy import
+- `users.txt` updated with the new username
+
+### 4. Start the secure server
+```bash
+python3 server.py
+```
+
+### 5. Install the user certificate (macOS) and auto-load the page
+```bash
+./setup_client.sh mario
+```
+
+This installs the user's credentials into macOS Keychain for Safari/Chrome.
+
+
+### 6. Open the application
+From any device in the LAN with a valid certificate:
+```
+https://your-local-ip:5010
 ```
 
 ---
 
-## 📁 Project structure
+## ❌ Removing a User
+
+To fully remove a user (certs + permissions):
+```bash
+./remove_user.sh <name> (es: mario)
+```
+
+---
+
+## 📁 Project Structure
 
 ```
-Local_sharing/
-├── certs/            # Your CA and server certificates
-├── clients/          # User certificates and private keys
-├── packages/         # Ready-to-send folders for each user
-├── templates/        # HTML files
-├── uploads/          # Uploaded files
-├── chat.txt          # Stored messages
-├── users.txt         # List of allowed usernames
-├── server.py         # HTTPS server
-├── add_user.sh       # Adds a new user
-├── remove_user.sh    # Removes a user
-├── setup_client.sh   # Installs a user's cert in system
+Local_sharing_CHATeFILES/
+├── certs/            # CA, client, and server certificates
+    ├── clients/        
+    ├── myCA/
+    ├── myServer/
+├── packages/         # Distributable client packages
+├── scripts/          # All the main scripts of the app
+├── serverStuff/
+    ├── templates/        # HTML interface (chat + file preview)
+    ├── uploads/          # Signed uploaded files
+    ├── chat.txt          # Stored messages
+├── server.py         # Flask-based HTTPS server
+├── users.txt         # Authorized usernames
 ```
+
+---
+
+## 💡 Concept
+
+Designed for **developers, families, or internal teams** who share a Wi-Fi or LAN and want:
+
+- Simple, secure local communication
+- Zero dependency on third-party services
+- Private data exchange with verified identities
+
+Whether you're exchanging sensitive files or just chatting on your LAN, **Local Sharing** gives you a trusted, encrypted, and verified space — offline.
 
 ---
 
@@ -105,13 +119,4 @@ Local_sharing/
 - Python 3
 - OpenSSL
 - macOS (for certificate automation)
-- Local network access
-
----
-
-## 🧠 Idea behind the project
-
-Designed for **teams, families, or developers** sharing a local Wi-Fi or LAN,  
-without relying on any third-party services — everything stays **local and encrypted**.
-
----
+- LAN/Wi-Fi environment
