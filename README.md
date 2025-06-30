@@ -73,6 +73,12 @@ https://your-local-ip:5010
 
 ---
 
+PAGE VIEW:
+<img width="1343" alt="Screenshot 2025-06-30 alle 22 25 21" src="https://github.com/user-attachments/assets/6f5ac070-bb00-4467-9c93-5b09fb20e353" />
+
+
+---
+
 ## ❌ Removing a User
 
 To fully remove a user (certs + permissions):
