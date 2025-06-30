@@ -1,3 +1,6 @@
+# Integrity Check Script server a verificare l'integrità dei file scaricati:
+# UTILIZZO: python3 integrity_check.py <file> <firma.sig> <certificato_server.crt>
+
 import sys
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding

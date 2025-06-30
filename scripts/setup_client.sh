@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Questo script importa un certificato client e la sua chiave privata nel portachiavi di macOS
+# e apre Safari per la connessione al server locale.
+
 USERNAME="$1"
 BASE_DIR="$(pwd)/.."
 CLIENTS_DIR="$BASE_DIR/certs/clients"

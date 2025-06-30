@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Questo script inizializza una CA locale e genera un certificato per un server
+
 CA_DIR="../certs/myCA"
 CERTS_DIR="../certs"
 mkdir -p "$CA_DIR" "$CERTS_DIR"

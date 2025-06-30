@@ -3,29 +3,28 @@ import os
 import subprocess
 from datetime import datetime
 from werkzeug.utils import secure_filename
-import hashlib
-import subprocess
+from flask import send_file
 
-# === Funzione per ottenere l'SSID della rete Wi-Fi ===
+# === Funzione per recuperare l'SSID Wi-Fi del Mac ===
 def get_ssid():
     try:
-        result = subprocess.run(
-            ["networksetup", "-listallhardwareports"],
-            capture_output=True, text=True
-        )
+        # Usa networksetup per trovare l'interfaccia Wi-Fi (di solito "en0")
+        result = subprocess.run(["networksetup", "-listallhardwareports"],
+                                capture_output=True, text=True)
         if result.returncode != 0:
             return None
 
+        # Cerca la riga con "Wi-Fi" e trova il nome del device
         lines = result.stdout.splitlines()
         for i in range(len(lines)):
             if "Wi-Fi" in lines[i] or "AirPort" in lines[i]:
                 device_line = lines[i + 1]
                 if "Device" in device_line:
                     device = device_line.split(": ")[1].strip()
-                    ssid_result = subprocess.run(
-                        ["ipconfig", "getsummary", device],
-                        capture_output=True, text=True
-                    )
+
+                    # Recupera l'SSID dal device
+                    ssid_result = subprocess.run(["ipconfig", "getsummary", device],
+                                                 capture_output=True, text=True)
                     for l in ssid_result.stdout.splitlines():
                         if " SSID" in l:
                             return l.split(": ")[1].strip()
@@ -34,7 +33,7 @@ def get_ssid():
         return None
     return None
 
-# === BASE DIR DINAMICA ===
+# === Percorsi di base ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "serverStuff/uploads")
 CHAT_LOG = os.path.join(BASE_DIR, "serverStuff/chat.txt")
@@ -42,27 +41,33 @@ USERS_FILE = os.path.join(BASE_DIR, "users.txt")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "serverStuff/templates")
 SERVER_KEY = os.path.join(BASE_DIR, "certs/myServer/server.key")
 
+# === Flask setup ===
 app = Flask(__name__, template_folder=TEMPLATES_DIR)
 app.secret_key = 'supersegreto'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# === Pagina principale con autenticazione del certificato ===
 @app.route("/", methods=['GET', 'POST'])
 def index():
+    # Recupera il certificato client dalla connessione TLS
     cert_pem = request.environ.get('SSL_CLIENT_CERT')
     if not cert_pem:
         return "Certificato client mancante o non fornito correttamente", 403
 
     try:
+        # Estrai il CN (Common Name) dal certificato X.509
         from OpenSSL import crypto
         x509 = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
         cn = x509.get_subject().CN
     except Exception as e:
         return f"Errore nella lettura del certificato: {e}", 500
 
+    # Salva l'utente in sessione se non già autenticato
     if session.get('username') != cn:
         session['username'] = cn
         print(f"🔐 Autenticato: {cn}")
 
+    # Controlla se l'utente è autorizzato (presente nel file users.txt)
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, 'r') as f:
             allowed_users = [line.strip() for line in f.readlines()]
@@ -71,6 +76,7 @@ def index():
     else:
         return "File users.txt non trovato", 500
 
+    # Recupera i file caricati e i messaggi della chat
     files = os.listdir(UPLOAD_FOLDER)
     messages = []
     if os.path.exists(CHAT_LOG):
@@ -78,13 +84,16 @@ def index():
             messages = f.readlines()
 
     ssid = get_ssid()
-    return render_template("index.html", files=files, messages=messages, username=session['username'], ssid=ssid)
+    return render_template("index.html", files=files, messages=messages,
+                           username=session['username'], ssid=ssid)
 
+# === Logout manuale ===
 @app.route("/logout")
 def logout():
     session.pop('username', None)
     return redirect(url_for('index'))
 
+# === Invia un messaggio nella chat ===
 @app.route("/send", methods=["POST"])
 def send():
     if 'username' not in session:
@@ -96,7 +105,7 @@ def send():
         f.write(f"[{now}] {session['username']}: {msg}\n")
     return '', 204
 
-
+# === Upload di un file con firma digitale ===
 @app.route("/upload", methods=['POST'])
 def upload():
     if 'username' not in session:
@@ -108,7 +117,7 @@ def upload():
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
 
-        # Firma digitale diretta del file usando la chiave privata del server
+        # Firma il file usando la chiave privata del server
         signature_path = filepath + '.sig'
         with open(filepath, 'rb') as f:
             subprocess.run([
@@ -120,17 +129,18 @@ def upload():
 
     return redirect(url_for('index'))
 
-from flask import send_file
-
+# === Download di un file ===
 @app.route('/files/<filename>')
 def serve_file(filename):
     if 'username' not in session:
-        return redirect(url_for('index'))  # Nessuna sessione? Torna alla login
+        return redirect(url_for('index'))
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     if os.path.exists(file_path):
         return send_file(file_path, as_attachment=True)
     else:
         return "File non trovato", 404
+
+# === Recupera i messaggi per aggiornare la chat in tempo reale ===
 @app.route("/messages")
 def get_messages():
     if os.path.exists(CHAT_LOG):
@@ -138,11 +148,13 @@ def get_messages():
             return "<br>".join(f.readlines())
     return ""
 
+# === Cancella la chat ===
 @app.route("/clear", methods=["POST"])
 def clear_chat():
     open(CHAT_LOG, 'w').close()
     return redirect(url_for('index'))
 
+# === Cancella tutti i file caricati ===
 @app.route("/clear_files", methods=["POST"])
 def clear_files():
     for filename in os.listdir(UPLOAD_FOLDER):
@@ -151,10 +163,11 @@ def clear_files():
             os.remove(file_path)
     return redirect(url_for('index'))
 
-# === Avvio con SSL e richiesta certificati client ===
+# === Server HTTPS con richiesta di certificato client ===
 if __name__ == '__main__':
     from werkzeug.serving import WSGIRequestHandler
 
+    # Custom handler per estrarre il certificato client nella request
     class PeerCertWSGIRequestHandler(WSGIRequestHandler):
         def make_environ(self):
             environ = super().make_environ()
@@ -167,17 +180,19 @@ if __name__ == '__main__':
                     environ['SSL_CLIENT_CERT'] = pem_cert
             return environ
 
+    # Setup TLS: certificato server, chiave e CA
     import ssl
-
     SERVER_CERT = os.path.join(BASE_DIR, "certs/myServer/server.crt")
     SERVER_KEY = os.path.join(BASE_DIR, "certs/myServer/server.key")
     CA_CERT = os.path.join(BASE_DIR, "certs/myCA/ca.crt")
 
+    # Richiede certificato client (mutual TLS)
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     context.load_cert_chain(certfile=SERVER_CERT, keyfile=SERVER_KEY)
     context.load_verify_locations(cafile=CA_CERT)
     context.verify_mode = ssl.CERT_REQUIRED
 
+    # Avvia il server Flask su HTTPS con autenticazione a 2 vie
     app.run(
         host='0.0.0.0',
         port=5010,

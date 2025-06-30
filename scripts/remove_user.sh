@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Questo script rimuove un utente e i suoi certificati dal sistema
+# e dal portachiavi di macOS.
+
 USERNAME="$1"
 BASE_DIR="$(pwd)/.."
 CLIENTS_DIR="$BASE_DIR/certs/clients"

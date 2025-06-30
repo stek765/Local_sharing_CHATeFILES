@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Questo script aggiunge un nuovo utente e genera i certificati necessari
+
 USERNAME="$1"
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"  # va nella cartella superiore rispetto a /scripts
 CLIENTS_DIR="$BASE_DIR/certs/clients"
